@@ -43,10 +43,10 @@ export default {
         ],
       },
     },
-    {
-      name: "gatsby",
-      options: { sites: [{ siteUrl: "preview-sanitycontentsyncmain.gtsb.io" }] },
-    },
+    // {
+    //   name: "gatsby",
+    //   options: { sites: [{ siteUrl: "preview-sanitycontentsyncmain.gtsb.io" }] },
+    // },
     { name: "project-users", layout: { height: "auto" } },
     {
       name: "document-list",

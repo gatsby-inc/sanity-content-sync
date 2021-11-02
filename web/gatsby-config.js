@@ -21,6 +21,7 @@ module.exports = {
         watchMode: !isProd,
         overlayDrafts: !isProd,
       },
+      graphqlTag: 'default',
     },
   ],
 };
