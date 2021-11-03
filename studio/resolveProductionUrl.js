@@ -8,11 +8,11 @@ export default function resolveProductionUrl(document) {
       id = document._id.split('drafts.')[1];
     }
 
-    console.log(id); 
+    const manifestId = `${id}-${document._updatedAt}`
+    const contentSyncUrl = 'https://www.gatsbyjs.com/content-sync/d72799e6-1875-43e1-99b7-41eb87644f19'
    
-    return `https://yourUrl.com/preview?pageId=${id}${
-      isDraft(document._id) ? '&isDraft=true' : ''
-    }`;
+   
+    return `${contentSyncUrl}/gatsby-source-sanity/${manifestId}`
   }
   return undefined;
 }
