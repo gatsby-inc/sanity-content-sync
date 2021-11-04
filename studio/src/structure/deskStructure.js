@@ -2,6 +2,8 @@ import S from "@sanity/desk-tool/structure-builder";
 import { MdSettings } from "react-icons/md";
 import { MdPerson, MdDescription, MdLocalOffer } from "react-icons/md";
 import IframePreview from "../previews/IframePreview";
+import Iframe from 'sanity-plugin-iframe-pane'; 
+import resolveProductionUrl from '../../resolveProductionUrl'
 
 // Web preview configuration
 const remoteURL = "https://sanity-gatsby-blog-contentsync.netlify.app";
@@ -21,10 +23,20 @@ export const getDefaultDocumentNode = (props) => {
   if (schemaType == "post") {
     return S.document().views([
       S.view.form(),
+      // S.view
+      //   .component(IframePreview)
+      //   .title("Web preview")
+      //   .options({ previewURL }),
       S.view
-        .component(IframePreview)
-        .title("Web preview")
-        .options({ previewURL }),
+      .component(Iframe)
+      .options({
+        url: (document) => resolveProductionUrl(document),
+        refresh: {
+          button: true, // default `undefined`
+          revision: true, // default `undefined`
+        },
+      })
+      .title('Gatsby Preview')
     ]);
   }
   return S.document().views([S.view.form()]);
