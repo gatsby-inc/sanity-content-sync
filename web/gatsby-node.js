@@ -35,14 +35,12 @@ async function createBlogPostPages(graphql, actions) {
     .filter((edge) => !isFuture(new Date(edge.node.publishedAt)))
     .forEach((edge) => {
       const { id, slug = {}, publishedAt } = edge.node;
-      console.log("id", id)
       const dateSegment = format(new Date(publishedAt), "yyyy/MM");
       const path = `/blog/${dateSegment}/${slug.current}/`;
 
       createPage({
         path,
         component: require.resolve("./src/templates/blog-post.js"),
-        ownerNodeId: id,
         context: { id },
       });
     });

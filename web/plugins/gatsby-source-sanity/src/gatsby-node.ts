@@ -387,7 +387,7 @@ function sanityCreateNodeManifest(
         (process.env.CONTENT_SYNC_DATOCMS_HOURS_SINCE_ENTRY_UPDATE ||
           ONE_WEEK);
       if (!nodeWasRecentlyUpdated) return;
-      console.log("id from manifest", node.id)
+
       const nodeForManifest = getNode(node.id) as Node
       const manifestId = `${publishedId}-${updatedAt}`
       console.info(`Sanity: Creating node manifest with id ${manifestId}`)
