@@ -14,8 +14,6 @@
     "@sanity/default-login",
     "@sanity/dashboard",
     "@sanity/desk-tool",
-    "@sanity/production-preview",
-    "dashboard-widget-structure-menu",
     "dashboard-widget-document-list",
     "dashboard-widget-netlify",
     "dashboard-widget-gatsby"
@@ -30,10 +28,6 @@
       "path": "./src/styles/variables.css"
     },
     {
-      "name": "part:@sanity/desk-tool/structure",
-      "path": "./src/structure/deskStructure.js"
-    },
-    {
       "implements": "part:@sanity/dashboard/config",
       "path": "./src/dashboardConfig.js"
     },
@@ -41,9 +35,9 @@
       "implements": "part:@sanity/dashboard/config",
       "path": "src/dashboardConfig.js"
     },
-    {
-      "implements": "part:@sanity/production-preview/resolve-production-url",
-      "path": "./resolveProductionUrl.js"
+    { 
+      "implements": "part:@sanity/base/document-actions/resolver", 
+      "path": "resolveDocumentActions.js" 
     }
   ]
 }
