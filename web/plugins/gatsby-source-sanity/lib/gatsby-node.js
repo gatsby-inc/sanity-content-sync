@@ -260,7 +260,7 @@ const sourceNodes = async (args, pluginConfig) => {
     reporter.info(`[sanity] Done! Exported ${documents.size} documents.`);
 };
 exports.sourceNodes = sourceNodes;
-const ONE_WEEK = 1000 * 60 * 60 * 24 * 7; // ms * sec * min * hr * day
+// const ONE_WEEK = 1000 * 60 * 60 * 24 * 7; // ms * sec * min * hr * day
 let nodeManifestWarningWasLogged;
 function sanityCreateNodeManifest(actions, args, node, publishedId) {
     try {
@@ -271,13 +271,13 @@ function sanityCreateNodeManifest(actions, args, node, publishedId) {
         const shouldCreateNodeManifest = createNodeManifestIsSupported && nodeTypeNeedsManifest;
         if (shouldCreateNodeManifest) {
             const updatedAt = node._updatedAt;
-            const nodeWasRecentlyUpdated = Date.now() - new Date(updatedAt).getTime() <=
-                // Default to only create manifests for items updated in last week
-                (process.env.CONTENT_SYNC_DATOCMS_HOURS_SINCE_ENTRY_UPDATE ||
-                    ONE_WEEK);
-            if (!nodeWasRecentlyUpdated)
-                return;
-            console.log("id from manifest", node.id);
+            console.log("updated at", updatedAt);
+            // const nodeWasRecentlyUpdated =
+            //   Date.now() - new Date(updatedAt).getTime() <=
+            //   // Default to only create manifests for items updated in last week
+            //   (process.env.CONTENT_SYNC_DATOCMS_HOURS_SINCE_ENTRY_UPDATE ||
+            //     ONE_WEEK);
+            // if (!nodeWasRecentlyUpdated) return;
             const nodeForManifest = getNode(node.id);
             const manifestId = `${publishedId}-${updatedAt}`;
             console.info(`Sanity: Creating node manifest with id ${manifestId}`);

@@ -392,7 +392,7 @@ var sourceNodes = function (args, pluginConfig) { return __awaiter(void 0, void 
     });
 }); };
 exports.sourceNodes = sourceNodes;
-var ONE_WEEK = 1000 * 60 * 60 * 24 * 7; // ms * sec * min * hr * day
+// const ONE_WEEK = 1000 * 60 * 60 * 24 * 7; // ms * sec * min * hr * day
 var nodeManifestWarningWasLogged;
 function sanityCreateNodeManifest(actions, args, node, publishedId) {
     try {
@@ -403,13 +403,13 @@ function sanityCreateNodeManifest(actions, args, node, publishedId) {
         var shouldCreateNodeManifest = createNodeManifestIsSupported && nodeTypeNeedsManifest;
         if (shouldCreateNodeManifest) {
             var updatedAt = node._updatedAt;
-            var nodeWasRecentlyUpdated = Date.now() - new Date(updatedAt).getTime() <=
-                // Default to only create manifests for items updated in last week
-                (process.env.CONTENT_SYNC_DATOCMS_HOURS_SINCE_ENTRY_UPDATE ||
-                    ONE_WEEK);
-            if (!nodeWasRecentlyUpdated)
-                return;
-            console.log("id from manifest", node.id);
+            console.log("updated at", updatedAt);
+            // const nodeWasRecentlyUpdated =
+            //   Date.now() - new Date(updatedAt).getTime() <=
+            //   // Default to only create manifests for items updated in last week
+            //   (process.env.CONTENT_SYNC_DATOCMS_HOURS_SINCE_ENTRY_UPDATE ||
+            //     ONE_WEEK);
+            // if (!nodeWasRecentlyUpdated) return;
             var nodeForManifest = getNode(node.id);
             var manifestId = publishedId + "-" + updatedAt;
             console.info("Sanity: Creating node manifest with id " + manifestId);
