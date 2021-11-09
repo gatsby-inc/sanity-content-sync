@@ -270,13 +270,14 @@ function sanityCreateNodeManifest(actions, args, node, publishedId) {
         const nodeTypeNeedsManifest = (node.internal.type === 'SanityPost');
         const shouldCreateNodeManifest = createNodeManifestIsSupported && nodeTypeNeedsManifest;
         if (shouldCreateNodeManifest) {
-            const updatedAt = node._updatedAt; //TODO: remove double quotes
+            const updatedAt = node._updatedAt;
             const nodeWasRecentlyUpdated = Date.now() - new Date(updatedAt).getTime() <=
                 // Default to only create manifests for items updated in last week
                 (process.env.CONTENT_SYNC_DATOCMS_HOURS_SINCE_ENTRY_UPDATE ||
                     ONE_WEEK);
             if (!nodeWasRecentlyUpdated)
                 return;
+            console.log("id from manifest", node.id);
             const nodeForManifest = getNode(node.id);
             const manifestId = `${publishedId}-${updatedAt}`;
             console.info(`Sanity: Creating node manifest with id ${manifestId}`);

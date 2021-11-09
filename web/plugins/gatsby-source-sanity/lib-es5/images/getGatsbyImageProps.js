@@ -130,7 +130,6 @@ function getGatsbyImageData(image, _a, loc) {
     }
     var _d = imageStub.metadata.dimensions, width = _d.width, height = _d.height;
     var builder = (0, image_url_1.default)(loc).image(image);
-    console.log(builder);
     var imageProps = (0, gatsby_plugin_image_1.generateImageData)(__assign(__assign({}, args), { pluginName: "gatsby-source-sanity", sourceMetadata: {
             format: 'auto',
             width: width,
@@ -148,8 +147,6 @@ function getGatsbyImageData(image, _a, loc) {
     if (placeholderDataURI) {
         imageProps.placeholder = { fallback: placeholderDataURI };
     }
-    console.log("image props", imageProps);
-    console.log(imageProps);
     return imageProps;
 }
 exports.getGatsbyImageData = getGatsbyImageData;

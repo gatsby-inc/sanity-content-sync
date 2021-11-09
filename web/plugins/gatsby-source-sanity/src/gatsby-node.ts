@@ -379,7 +379,7 @@ function sanityCreateNodeManifest(
     const shouldCreateNodeManifest = createNodeManifestIsSupported && nodeTypeNeedsManifest
   
     if (shouldCreateNodeManifest) {  
-      const updatedAt = node._updatedAt as string; //TODO: remove double quotes
+      const updatedAt = node._updatedAt as string; 
   
       const nodeWasRecentlyUpdated =
         Date.now() - new Date(updatedAt).getTime() <=
@@ -387,6 +387,7 @@ function sanityCreateNodeManifest(
         (process.env.CONTENT_SYNC_DATOCMS_HOURS_SINCE_ENTRY_UPDATE ||
           ONE_WEEK);
       if (!nodeWasRecentlyUpdated) return;
+      console.log("id from manifest", node.id)
       const nodeForManifest = getNode(node.id) as Node
       const manifestId = `${publishedId}-${updatedAt}`
       console.info(`Sanity: Creating node manifest with id ${manifestId}`)
