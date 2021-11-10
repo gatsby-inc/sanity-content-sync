@@ -362,7 +362,7 @@ export const sourceNodes: GatsbyNode['sourceNodes'] = async (
   reporter.info(`[sanity] Done! Exported ${documents.size} documents.`)
 }
 
-// const ONE_WEEK = 1000 * 60 * 60 * 24 * 7; // ms * sec * min * hr * day
+const ONE_WEEK = 1000 * 60 * 60 * 24 * 7; // ms * sec * min * hr * day
 let nodeManifestWarningWasLogged: boolean
 
 function sanityCreateNodeManifest(
@@ -380,13 +380,12 @@ function sanityCreateNodeManifest(
     
     if (shouldCreateNodeManifest) {  
       const updatedAt = node._updatedAt as string; 
-      console.log("updated at", updatedAt)
-      // const nodeWasRecentlyUpdated =
-      //   Date.now() - new Date(updatedAt).getTime() <=
-      //   // Default to only create manifests for items updated in last week
-      //   (process.env.CONTENT_SYNC_DATOCMS_HOURS_SINCE_ENTRY_UPDATE ||
-      //     ONE_WEEK);
-      // if (!nodeWasRecentlyUpdated) return;
+      const nodeWasRecentlyUpdated =
+        Date.now() - new Date(updatedAt).getTime() <=
+        // Default to only create manifests for items updated in last week
+        (process.env.CONTENT_SYNC_SANITY_HOURS_SINCE_ENTRY_UPDATE ||
+          ONE_WEEK);
+      if (!nodeWasRecentlyUpdated) return;
 
       const nodeForManifest = getNode(node.id) as Node
       const manifestId = `${publishedId}-${updatedAt}`
