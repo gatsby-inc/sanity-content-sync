@@ -285,6 +285,7 @@ var sourceNodes = function (args, pluginConfig) { return __awaiter(void 0, void 
                     var node = (0, normalize_1.toGatsbyNode)(published, processingOptions);
                     gatsbyNodes.set(publishedId, node);
                     createNode(node);
+                    sanityCreateNodeManifest(actions, args, node, publishedId);
                 }
                 else {
                     // the published document has been removed (note - we either have no draft or overlayDrafts is not enabled so merely removing is ok here)
@@ -299,6 +300,7 @@ var sourceNodes = function (args, pluginConfig) { return __awaiter(void 0, void 
                 var node = (0, normalize_1.toGatsbyNode)(published, processingOptions);
                 gatsbyNodes.set(publishedId, node);
                 createNode(node);
+                sanityCreateNodeManifest(actions, args, node, publishedId);
             }
         }
         if (id === draftId && overlayDrafts) {
@@ -315,6 +317,7 @@ var sourceNodes = function (args, pluginConfig) { return __awaiter(void 0, void 
             var node = (0, normalize_1.toGatsbyNode)((draft || published), processingOptions);
             gatsbyNodes.set(publishedId, node);
             createNode(node);
+            sanityCreateNodeManifest(actions, args, node, publishedId);
         }
     }
     function syncAllWithGatsby() {
@@ -528,6 +531,38 @@ function downloadDocuments(url, token, options) {
             });
         });
     });
+}
+var ONE_WEEK = 1000 * 60 * 60 * 24 * 7; // ms * sec * min * hr * day
+var nodeManifestWarningWasLogged;
+function sanityCreateNodeManifest(actions, args, node, publishedId) {
+    try {
+        var unstable_createNodeManifest = actions.unstable_createNodeManifest;
+        var getNode = args.getNode;
+        var createNodeManifestIsSupported = typeof unstable_createNodeManifest === "function";
+        var nodeTypeNeedsManifest = (node.internal.type === 'SanityPost');
+        var shouldCreateNodeManifest = createNodeManifestIsSupported && nodeTypeNeedsManifest;
+        if (shouldCreateNodeManifest) {
+            var updatedAt = node._updatedAt;
+            var nodeWasRecentlyUpdated = Date.now() - new Date(updatedAt).getTime() <=
+                // Default to only create manifests for items updated in last week
+                (process.env.CONTENT_SYNC_SANITY_HOURS_SINCE_ENTRY_UPDATE ||
+                    ONE_WEEK);
+            if (!nodeWasRecentlyUpdated)
+                return;
+            var nodeForManifest = getNode(node.id);
+            var manifestId = publishedId + "-" + updatedAt;
+            console.info("Sanity: Creating node manifest with id " + manifestId);
+            actions.unstable_createNodeManifest({ manifestId: manifestId, node: nodeForManifest });
+        }
+        else if (!createNodeManifestIsSupported && !nodeManifestWarningWasLogged) {
+            console.warn("Sanity: Your version of Gatsby core doesn't support Content Sync (via the unstable_createNodeManifest action). Please upgrade to the latest version to use Content Sync in your site.");
+            nodeManifestWarningWasLogged = true;
+        }
+    }
+    catch (e) {
+        var result = e.message;
+        console.info("Cannot create node manifest", result);
+    }
 }
 function getClient(config) {
     var projectId = config.projectId, dataset = config.dataset, token = config.token;
