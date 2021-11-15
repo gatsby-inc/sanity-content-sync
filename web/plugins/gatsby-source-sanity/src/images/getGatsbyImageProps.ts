@@ -221,6 +221,6 @@ export function getGatsbyImageData(
   if (placeholderDataURI) {
     imageProps.placeholder = {fallback: placeholderDataURI}
   }
- 
+
   return imageProps
 }

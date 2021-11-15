@@ -50,6 +50,31 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
         if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
 };
+var __read = (this && this.__read) || function (o, n) {
+    var m = typeof Symbol === "function" && o[Symbol.iterator];
+    if (!m) return o;
+    var i = m.call(o), r, ar = [], e;
+    try {
+        while ((n === void 0 || n-- > 0) && !(r = i.next()).done) ar.push(r.value);
+    }
+    catch (error) { e = { error: error }; }
+    finally {
+        try {
+            if (r && !r.done && (m = i["return"])) m.call(i);
+        }
+        finally { if (e) throw e.error; }
+    }
+    return ar;
+};
+var __spreadArray = (this && this.__spreadArray) || function (to, from, pack) {
+    if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
+        if (ar || !(i in from)) {
+            if (!ar) ar = Array.prototype.slice.call(from, 0, i);
+            ar[i] = from[i];
+        }
+    }
+    return to.concat(ar || Array.prototype.slice.call(from));
+};
 var __values = (this && this.__values) || function(o) {
     var s = typeof Symbol === "function" && Symbol.iterator, m = s && o[s], i = 0;
     if (m) return m.call(o);
@@ -82,6 +107,8 @@ var getAllDocuments_1 = require("./util/getAllDocuments");
 var oneline_1 = __importDefault(require("oneline"));
 var lodash_1 = require("lodash");
 var debug_1 = __importDefault(require("./debug"));
+var handleDeltaChanges_1 = __importDefault(require("./util/handleDeltaChanges"));
+var getPluginStatus_1 = require("./util/getPluginStatus");
 var coreSupportsOnPluginInit;
 try {
     var isGatsbyNodeLifecycleSupported = require("gatsby-plugin-utils").isGatsbyNodeLifecycleSupported;
@@ -294,40 +321,41 @@ var sourceNodes = function (args, pluginConfig) { return __awaiter(void 0, void 
         }
     }
     function syncAllWithGatsby() {
-        var e_1, _a;
+        var e_2, _a;
         try {
             for (var _b = __values(documents.keys()), _c = _b.next(); !_c.done; _c = _b.next()) {
                 var id = _c.value;
                 syncWithGatsby(id);
             }
         }
-        catch (e_1_1) { e_1 = { error: e_1_1 }; }
+        catch (e_2_1) { e_2 = { error: e_2_1 }; }
         finally {
             try {
                 if (_c && !_c.done && (_a = _b.return)) _a.call(_b);
             }
-            finally { if (e_1) throw e_1.error; }
+            finally { if (e_2) throw e_2.error; }
         }
     }
     function syncIdsWithGatsby(ids) {
-        var e_2, _a;
+        var e_3, _a;
         try {
             for (var ids_1 = __values(ids), ids_1_1 = ids_1.next(); !ids_1_1.done; ids_1_1 = ids_1.next()) {
                 var id = ids_1_1.value;
                 syncWithGatsby(id);
             }
         }
-        catch (e_2_1) { e_2 = { error: e_2_1 }; }
+        catch (e_3_1) { e_3 = { error: e_3_1 }; }
         finally {
             try {
                 if (ids_1_1 && !ids_1_1.done && (_a = ids_1.return)) _a.call(ids_1);
             }
-            finally { if (e_2) throw e_2.error; }
+            finally { if (e_3) throw e_3.error; }
         }
     }
-    var config, dataset, overlayDrafts, watchMode, actions, createNodeId, createContentDigest, reporter, webhookBody, createNode, deleteNode, createParentChildLink, typeMapKey, typeMap, client, url, processingOptions, webhookHandled, documents, gatsbyNodes;
-    return __generator(this, function (_a) {
-        switch (_a.label) {
+    var config, dataset, overlayDrafts, watchMode, actions, createNodeId, createContentDigest, reporter, webhookBody, createNode, deleteNode, createParentChildLink, typeMapKey, typeMap, client, url, processingOptions, webhookHandled, lastBuildTime, documentIds_2, typeMapStateKeys, sanityDocTypes, sanityDocTypes_1, sanityDocTypes_1_1, docType, deltaHandled, error_1, documents, gatsbyNodes;
+    var e_1, _a;
+    return __generator(this, function (_b) {
+        switch (_b.label) {
             case 0:
                 config = __assign(__assign({}, defaultConfig), pluginConfig);
                 dataset = config.dataset, overlayDrafts = config.overlayDrafts, watchMode = config.watchMode;
@@ -351,7 +379,7 @@ var sourceNodes = function (args, pluginConfig) { return __awaiter(void 0, void 
                     // Otherwise, we'd be overloading Gatsby's preview servers on large datasets.
                 ];
             case 1:
-                webhookHandled = _a.sent();
+                webhookHandled = _b.sent();
                 // Even if the webhook body is invalid, let's avoid re-fetching all documents.
                 // Otherwise, we'd be overloading Gatsby's preview servers on large datasets.
                 if (!webhookHandled) {
@@ -360,10 +388,69 @@ var sourceNodes = function (args, pluginConfig) { return __awaiter(void 0, void 
                 }
                 return [2 /*return*/];
             case 2:
+                lastBuildTime = (0, getPluginStatus_1.getLastBuildTime)(args);
+                if (!lastBuildTime) return [3 /*break*/, 7];
+                _b.label = 3;
+            case 3:
+                _b.trys.push([3, 6, , 7]);
+                return [4 /*yield*/, client.fetch("*[!(_type match \"system.**\")]._id")];
+            case 4:
+                documentIds_2 = (_b.sent()).map(documentIds_1.unprefixId);
+                typeMapStateKeys = Object.keys(stateCache).filter(function (key) { return key.endsWith('typeMap'); });
+                sanityDocTypes = Array.from(
+                // De-duplicate types with a Set
+                new Set(typeMapStateKeys.reduce(function (types, curKey) {
+                    var map = stateCache[curKey];
+                    var documentTypes = Object.keys(map.objects).filter(function (key) { return map.objects[key].isDocument; });
+                    return __spreadArray(__spreadArray([], __read(types), false), __read(documentTypes), false);
+                }, [])));
+                try {
+                    // 3/4. From these types, get all nodes from store that are created from this plugin.
+                    // (we didn't use args.getNodes() as that'd be too expensive - hence why we limit it to Sanity-only types)
+                    for (sanityDocTypes_1 = __values(sanityDocTypes), sanityDocTypes_1_1 = sanityDocTypes_1.next(); !sanityDocTypes_1_1.done; sanityDocTypes_1_1 = sanityDocTypes_1.next()) {
+                        docType = sanityDocTypes_1_1.value;
+                        args
+                            .getNodesByType(docType)
+                            // If a document isn't included in documentIds, that means it was deleted since lastBuildTime. Don't touch it.
+                            .filter(function (node) {
+                            return node.internal.owner === 'gatsby-source-sanity' &&
+                                typeof node._id === 'string' &&
+                                documentIds_2.includes((0, documentIds_1.unprefixId)(node._id));
+                        })
+                            // 4/4. touch valid documents to prevent Gatsby from deleting them
+                            .forEach(function (node) { return actions.touchNode(node); });
+                    }
+                }
+                catch (e_1_1) { e_1 = { error: e_1_1 }; }
+                finally {
+                    try {
+                        if (sanityDocTypes_1_1 && !sanityDocTypes_1_1.done && (_a = sanityDocTypes_1.return)) _a.call(sanityDocTypes_1);
+                    }
+                    finally { if (e_1) throw e_1.error; }
+                }
+                return [4 /*yield*/, (0, handleDeltaChanges_1.default)({
+                        args: args,
+                        lastBuildTime: lastBuildTime,
+                        client: client,
+                        processingOptions: processingOptions,
+                    })];
+            case 5:
+                deltaHandled = _b.sent();
+                if (deltaHandled) {
+                    return [2 /*return*/];
+                }
+                else {
+                    reporter.warn("[sanity] Couldn't retrieve latest changes. Will fetch all documents instead.");
+                }
+                return [3 /*break*/, 7];
+            case 6:
+                error_1 = _b.sent();
+                return [3 /*break*/, 7];
+            case 7:
                 reporter.info('[sanity] Fetching export stream for dataset');
                 return [4 /*yield*/, downloadDocuments(url, config.token, { includeDrafts: overlayDrafts })];
-            case 3:
-                documents = _a.sent();
+            case 8:
+                documents = _b.sent();
                 gatsbyNodes = new Map();
                 if (watchMode) {
                     // Note: since we don't setup the listener before *after* all documents has been fetched here we will miss any events that
@@ -386,45 +473,14 @@ var sourceNodes = function (args, pluginConfig) { return __awaiter(void 0, void 
                 }
                 // do the initial sync from sanity documents to gatsby nodes
                 syncAllWithGatsby();
+                // register the current build time for accessing it in handleDeltaChanges for future builds
+                (0, getPluginStatus_1.registerBuildTime)(args);
                 reporter.info("[sanity] Done! Exported " + documents.size + " documents.");
                 return [2 /*return*/];
         }
     });
 }); };
 exports.sourceNodes = sourceNodes;
-// const ONE_WEEK = 1000 * 60 * 60 * 24 * 7; // ms * sec * min * hr * day
-var nodeManifestWarningWasLogged;
-function sanityCreateNodeManifest(actions, args, node, publishedId) {
-    try {
-        var unstable_createNodeManifest = actions.unstable_createNodeManifest;
-        var getNode = args.getNode;
-        var createNodeManifestIsSupported = typeof unstable_createNodeManifest === "function";
-        var nodeTypeNeedsManifest = (node.internal.type === 'SanityPost');
-        var shouldCreateNodeManifest = createNodeManifestIsSupported && nodeTypeNeedsManifest;
-        if (shouldCreateNodeManifest) {
-            var updatedAt = node._updatedAt;
-            console.log("updated at", updatedAt);
-            // const nodeWasRecentlyUpdated =
-            //   Date.now() - new Date(updatedAt).getTime() <=
-            //   // Default to only create manifests for items updated in last week
-            //   (process.env.CONTENT_SYNC_DATOCMS_HOURS_SINCE_ENTRY_UPDATE ||
-            //     ONE_WEEK);
-            // if (!nodeWasRecentlyUpdated) return;
-            var nodeForManifest = getNode(node.id);
-            var manifestId = publishedId + "-" + updatedAt;
-            console.info("Sanity: Creating node manifest with id " + manifestId);
-            actions.unstable_createNodeManifest({ manifestId: manifestId, node: nodeForManifest });
-        }
-        else if (!createNodeManifestIsSupported && !nodeManifestWarningWasLogged) {
-            console.warn("Sanity: Your version of Gatsby core doesn't support Content Sync (via the unstable_createNodeManifest action). Please upgrade to the latest version to use Content Sync in your site.");
-            nodeManifestWarningWasLogged = true;
-        }
-    }
-    catch (e) {
-        var result = e.message;
-        console.info("Cannot create node manifest", result);
-    }
-}
 var setFieldsOnGraphQLNodeType = function (context, pluginConfig) { return __awaiter(void 0, void 0, void 0, function () {
     var type, fields;
     return __generator(this, function (_a) {
@@ -475,6 +531,38 @@ function downloadDocuments(url, token, options) {
             });
         });
     });
+}
+var ONE_WEEK = 1000 * 60 * 60 * 24 * 7; // ms * sec * min * hr * day
+var nodeManifestWarningWasLogged;
+function sanityCreateNodeManifest(actions, args, node, publishedId) {
+    try {
+        var unstable_createNodeManifest = actions.unstable_createNodeManifest;
+        var getNode = args.getNode;
+        var createNodeManifestIsSupported = typeof unstable_createNodeManifest === "function";
+        var nodeTypeNeedsManifest = (node.internal.type === 'SanityPost');
+        var shouldCreateNodeManifest = createNodeManifestIsSupported && nodeTypeNeedsManifest;
+        if (shouldCreateNodeManifest) {
+            var updatedAt = node._updatedAt;
+            var nodeWasRecentlyUpdated = Date.now() - new Date(updatedAt).getTime() <=
+                // Default to only create manifests for items updated in last week
+                (process.env.CONTENT_SYNC_SANITY_HOURS_SINCE_ENTRY_UPDATE ||
+                    ONE_WEEK);
+            if (!nodeWasRecentlyUpdated)
+                return;
+            var nodeForManifest = getNode(node.id);
+            var manifestId = publishedId + "-" + updatedAt;
+            console.info("Sanity: Creating node manifest with id " + manifestId);
+            actions.unstable_createNodeManifest({ manifestId: manifestId, node: nodeForManifest });
+        }
+        else if (!createNodeManifestIsSupported && !nodeManifestWarningWasLogged) {
+            console.warn("Sanity: Your version of Gatsby core doesn't support Content Sync (via the unstable_createNodeManifest action). Please upgrade to the latest version to use Content Sync in your site.");
+            nodeManifestWarningWasLogged = true;
+        }
+    }
+    catch (e) {
+        var result = e.message;
+        console.info("Cannot create node manifest", result);
+    }
 }
 function getClient(config) {
     var projectId = config.projectId, dataset = config.dataset, token = config.token;
