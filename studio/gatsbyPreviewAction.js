@@ -15,7 +15,7 @@ export function gatsbyPreviewAction({ published, draft }) {
   return {
     disabled: !id,
     icon: RiGatsbyLine,
-    label: "Gatsby Preview",
+    label: "Open Preview",
     onHandle: () => {
       window.open(
         `${contentSyncUrl}/gatsby-source-sanity/${id}-${updatedAt}`,
