@@ -3,9 +3,7 @@ import {GraphQLFieldConfig} from 'gatsby/graphql'
 import gatsbyPkg from 'gatsby/package.json'
 import SanityClient from '@sanity/client'
 import {
-  Node,
-  Actions,
-  CreateSchemaCustomizationArgs, 
+  CreateSchemaCustomizationArgs,
   GatsbyNode,
   ParentSpanPluginArgs,
   PluginOptions,
@@ -37,8 +35,10 @@ import {prefixId, unprefixId} from './util/documentIds'
 import {getAllDocuments} from './util/getAllDocuments'
 import oneline from 'oneline'
 import {uniq} from 'lodash'
-import {SanityInputNode } from './types/gatsby'
+import {SanityInputNode} from './types/gatsby'
 import debug from './debug'
+import handleDeltaChanges from './util/handleDeltaChanges'
+import {getLastBuildTime, registerBuildTime} from './util/getPluginStatus'
 
 let coreSupportsOnPluginInit: 'unstable' | 'stable' | undefined
 
@@ -186,8 +186,8 @@ export const sourceNodes: GatsbyNode['sourceNodes'] = async (
   const config = {...defaultConfig, ...pluginConfig}
   const {dataset, overlayDrafts, watchMode} = config
   const {actions, createNodeId, createContentDigest, reporter, webhookBody} = args
-  const {createNode, deleteNode, createParentChildLink } = actions
-  
+  const {createNode, deleteNode, createParentChildLink} = actions
+
   const typeMapKey = getCacheKey(pluginConfig, CACHE_KEYS.TYPE_MAP)
   const typeMap = (stateCache[typeMapKey] || defaultTypeMap) as TypeMap
 
@@ -223,11 +223,74 @@ export const sourceNodes: GatsbyNode['sourceNodes'] = async (
     return
   }
 
+  // If we have a warm build, let's fetch only those which changed since the last build
+  const lastBuildTime = getLastBuildTime(args)
+  if (lastBuildTime) {
+    try {
+      // Let's make sure we keep documents nodes already in the cache (3 steps)
+      // =========
+      // 1/4. Get all valid document IDs from Sanity
+      const documentIds = (await client.fetch<string[]>(`*[!(_type match "system.**")]._id`)).map(
+        unprefixId,
+      )
+
+      // 2/4. Get all document types implemented in the GraphQL layer
+      // @initializePlugin() will populate `stateCache` with 1+ TypeMaps
+      const typeMapStateKeys = Object.keys(stateCache).filter((key) => key.endsWith('typeMap'))
+      // Let's take all document types from these TypeMaps
+      const sanityDocTypes = Array.from(
+        // De-duplicate types with a Set
+        new Set(
+          typeMapStateKeys.reduce((types, curKey) => {
+            const map = stateCache[curKey] as TypeMap
+            const documentTypes = Object.keys(map.objects).filter(
+              (key) => map.objects[key].isDocument,
+            )
+            return [...types, ...documentTypes]
+          }, [] as string[]),
+        ),
+      )
+
+      // 3/4. From these types, get all nodes from store that are created from this plugin.
+      // (we didn't use args.getNodes() as that'd be too expensive - hence why we limit it to Sanity-only types)
+      for (const docType of sanityDocTypes) {
+        args
+          .getNodesByType(docType)
+          // If a document isn't included in documentIds, that means it was deleted since lastBuildTime. Don't touch it.
+          .filter(
+            (node) =>
+              node.internal.owner === 'gatsby-source-sanity' &&
+              typeof node._id === 'string' &&
+              documentIds.includes(unprefixId(node._id)),
+          )
+          // 4/4. touch valid documents to prevent Gatsby from deleting them
+          .forEach((node) => actions.touchNode(node))
+      }
+
+      // With existing documents cached, let's handle those that changed since last build
+      const deltaHandled = await handleDeltaChanges({
+        args,
+        lastBuildTime,
+        client,
+        processingOptions,
+      })
+      if (deltaHandled) {
+        return
+      } else {
+        reporter.warn(
+          "[sanity] Couldn't retrieve latest changes. Will fetch all documents instead.",
+        )
+      }
+    } catch (error) {
+      // lastBuildTime isn't a date, ignore it
+    }
+  }
+
   reporter.info('[sanity] Fetching export stream for dataset')
 
   const documents = await downloadDocuments(url, config.token, {includeDrafts: overlayDrafts})
   const gatsbyNodes = new Map<string, SanityInputNode>()
-  
+
   // sync a single document from the local cache of known documents with gatsby
   function syncWithGatsby(id: string) {
     const publishedId = unprefixId(id)
@@ -268,11 +331,8 @@ export const sourceNodes: GatsbyNode['sourceNodes'] = async (
         if (published) {
           debug('updating gatsby node for %s', publishedId)
           const node = toGatsbyNode(published, processingOptions)
-          
           gatsbyNodes.set(publishedId, node)
           createNode(node)
-
-          sanityCreateNodeManifest(actions, args, node, publishedId)
         } else {
           // the published document has been removed (note - we either have no draft or overlayDrafts is not enabled so merely removing is ok here)
           debug(
@@ -288,8 +348,6 @@ export const sourceNodes: GatsbyNode['sourceNodes'] = async (
         const node = toGatsbyNode(published, processingOptions)
         gatsbyNodes.set(publishedId, node)
         createNode(node)
-
-        sanityCreateNodeManifest(actions, args, node, publishedId)
       }
     }
     if (id === draftId && overlayDrafts) {
@@ -312,10 +370,8 @@ export const sourceNodes: GatsbyNode['sourceNodes'] = async (
       )
       // pick the draft if we can, otherwise pick the published
       const node = toGatsbyNode((draft || published)!, processingOptions)
-      
       gatsbyNodes.set(publishedId, node)
       createNode(node)
-      sanityCreateNodeManifest(actions, args, node, publishedId)
     }
   }
 
@@ -359,51 +415,10 @@ export const sourceNodes: GatsbyNode['sourceNodes'] = async (
   }
   // do the initial sync from sanity documents to gatsby nodes
   syncAllWithGatsby()
+  // register the current build time for accessing it in handleDeltaChanges for future builds
+  registerBuildTime(args)
   reporter.info(`[sanity] Done! Exported ${documents.size} documents.`)
 }
-
-const ONE_WEEK = 1000 * 60 * 60 * 24 * 7; // ms * sec * min * hr * day
-let nodeManifestWarningWasLogged: boolean
-
-function sanityCreateNodeManifest(
-  actions: Actions, 
-  args: SourceNodesArgs, 
-  node: SanityInputNode, 
-  publishedId: string) {
-  try {
-    const { unstable_createNodeManifest } = actions; 
-    const { getNode } = args; 
-    
-    const createNodeManifestIsSupported = typeof unstable_createNodeManifest === `function`; 
-    const nodeTypeNeedsManifest = (node.internal.type === 'SanityPost')
-    const shouldCreateNodeManifest = createNodeManifestIsSupported && nodeTypeNeedsManifest
-    
-    if (shouldCreateNodeManifest) {  
-      const updatedAt = node._updatedAt as string; 
-      const nodeWasRecentlyUpdated =
-        Date.now() - new Date(updatedAt).getTime() <=
-        // Default to only create manifests for items updated in last week
-        (process.env.CONTENT_SYNC_SANITY_HOURS_SINCE_ENTRY_UPDATE ||
-          ONE_WEEK);
-      if (!nodeWasRecentlyUpdated) return;
-
-      const nodeForManifest = getNode(node.id) as Node
-      const manifestId = `${publishedId}-${updatedAt}`
-      console.info(`Sanity: Creating node manifest with id ${manifestId}`)
-      
-      actions.unstable_createNodeManifest({ manifestId, node: nodeForManifest })
-    } else if (!createNodeManifestIsSupported && !nodeManifestWarningWasLogged) {
-      console.warn(
-        `Sanity: Your version of Gatsby core doesn't support Content Sync (via the unstable_createNodeManifest action). Please upgrade to the latest version to use Content Sync in your site.`,
-      );
-      nodeManifestWarningWasLogged = true;
-    }
-  } catch (e) {
-    let result = (e as Error).message;
-    console.info(`Cannot create node manifest`, result);
-  }
-}
-
 
 export const setFieldsOnGraphQLNodeType: GatsbyNode['setFieldsOnGraphQLNodeType'] = async (
   context: SetFieldsOnGraphQLNodeTypeArgs,

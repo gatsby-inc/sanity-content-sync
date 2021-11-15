@@ -35,116 +35,30 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
         if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
 };
-var __read = (this && this.__read) || function (o, n) {
-    var m = typeof Symbol === "function" && o[Symbol.iterator];
-    if (!m) return o;
-    var i = m.call(o), r, ar = [], e;
-    try {
-        while ((n === void 0 || n-- > 0) && !(r = i.next()).done) ar.push(r.value);
-    }
-    catch (error) { e = { error: error }; }
-    finally {
-        try {
-            if (r && !r.done && (m = i["return"])) m.call(i);
-        }
-        finally { if (e) throw e.error; }
-    }
-    return ar;
-};
-var __spreadArray = (this && this.__spreadArray) || function (to, from, pack) {
-    if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
-        if (ar || !(i in from)) {
-            if (!ar) ar = Array.prototype.slice.call(from, 0, i);
-            ar[i] = from[i];
-        }
-    }
-    return to.concat(ar || Array.prototype.slice.call(from));
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.validateWebhookPayload = exports.handleWebhookEvent = void 0;
 var debug_1 = __importDefault(require("../debug"));
-var normalize_1 = require("./normalize");
 var documentIds_1 = require("./documentIds");
-function handleV1Webhook(args, options) {
+/**
+ * Gets a document id received from the webhook & delete it in the store.
+ */
+function handleDeleteWebhook(args, options) {
     return __awaiter(this, void 0, void 0, function () {
-        var client, processingOptions, webhookBody, reporter, ids, created, deleted, updated, refetchIds, numRefreshed, touchedDocs, newDocuments, createdDocs, updatedDocs;
+        var webhookBody, reporter, rawId, dataset, projectId, publishedDocumentId, config;
         return __generator(this, function (_a) {
-            switch (_a.label) {
-                case 0:
-                    client = options.client, processingOptions = options.processingOptions;
-                    webhookBody = args.webhookBody, reporter = args.reporter;
-                    ids = webhookBody.ids;
-                    created = ids.created, deleted = ids.deleted, updated = ids.updated;
-                    refetchIds = __spreadArray(__spreadArray([], __read(created), false), __read(updated), false);
-                    numRefreshed = 0;
-                    if (deleted.length > 0) {
-                        numRefreshed += handleDeletedDocuments(args, deleted);
-                    }
-                    touchedDocs = [];
-                    if (!(refetchIds.length > 0)) return [3 /*break*/, 2];
-                    reporter.info("[sanity] Refetching " + refetchIds.length + " documents");
-                    return [4 /*yield*/, client.getDocuments(refetchIds, {
-                            tag: 'sanity.gatsby.webhook-refetch',
-                        })];
-                case 1:
-                    newDocuments = _a.sent();
-                    touchedDocs = newDocuments.filter(isDocument);
-                    _a.label = 2;
-                case 2:
-                    if (created.length > 0) {
-                        createdDocs = created
-                            .map(function (id) { return touchedDocs.find(function (doc) { return doc && doc._id === id; }); })
-                            .filter(isDocument);
-                        numRefreshed += handleChangedDocuments(args, createdDocs, processingOptions, 'created');
-                    }
-                    if (updated.length > 0) {
-                        updatedDocs = updated
-                            .map(function (id) { return touchedDocs.find(function (doc) { return doc && doc._id === id; }); })
-                            .filter(isDocument);
-                        numRefreshed += handleChangedDocuments(args, updatedDocs, processingOptions, 'created');
-                    }
-                    reporter.info("Refreshed " + numRefreshed + " documents");
-                    return [2 /*return*/, true];
-            }
-        });
-    });
-}
-function handleV2Webhook(args, options) {
-    return __awaiter(this, void 0, void 0, function () {
-        var webhookBody, reporter, _a, operation, rawId, dataset, projectId, document, publishedDocumentId, config, overlayDrafts;
-        return __generator(this, function (_b) {
             webhookBody = args.webhookBody, reporter = args.reporter;
-            _a = webhookBody.operation, operation = _a === void 0 ? 'update' : _a, rawId = webhookBody.documentId, dataset = webhookBody.dataset, projectId = webhookBody.projectId, document = webhookBody.after;
+            rawId = webhookBody.documentId, dataset = webhookBody.dataset, projectId = webhookBody.projectId;
             publishedDocumentId = (0, documentIds_1.unprefixId)(rawId);
             config = options.client.config();
-            overlayDrafts = options.processingOptions.overlayDrafts;
             if (projectId && dataset && (config.projectId !== projectId || config.dataset !== dataset)) {
                 return [2 /*return*/, false];
             }
-            if (operation === 'create' &&
-                (document === null || document === void 0 ? void 0 : document._id) &&
-                // Don't create node if a draft document w/ overlayDrafts === false
-                (!document._id.startsWith('drafts.') || overlayDrafts)) {
-                handleChangedDocuments(args, [document], options.processingOptions, 'created');
-                reporter.info("Created 1 document");
-                return [2 /*return*/, true];
-            }
-            if (operation === 'update' &&
-                (document === null || document === void 0 ? void 0 : document._id) &&
-                (!document._id.startsWith('drafts.') || overlayDrafts)) {
-                handleChangedDocuments(args, [document], options.processingOptions, 'updated');
-                reporter.info("Refreshed 1 document");
-                return [2 /*return*/, true];
-            }
-            if (operation === 'delete') {
-                handleDeletedDocuments(args, [publishedDocumentId]);
-                reporter.info("Deleted 1 document");
-                return [2 /*return*/, true];
-            }
-            return [2 /*return*/, false];
+            handleDeletedDocuments(args, [publishedDocumentId]);
+            reporter.info("Deleted 1 document");
+            return [2 /*return*/, true];
         });
     });
 }
@@ -157,18 +71,14 @@ function handleWebhookEvent(args, options) {
                     webhookBody = args.webhookBody, reporter = args.reporter;
                     validated = validateWebhookPayload(webhookBody);
                     if (validated === false) {
-                        (0, debug_1.default)('Invalid/non-sanity webhook payload received');
+                        (0, debug_1.default)('[sanity] Invalid/non-sanity webhook payload received');
                         return [2 /*return*/, false];
                     }
                     reporter.info('[sanity] Processing changed documents from webhook');
-                    if (!(validated === 'v1')) return [3 /*break*/, 2];
-                    return [4 /*yield*/, handleV1Webhook(args, options)];
+                    if (!(validated === 'delete-operation')) return [3 /*break*/, 2];
+                    return [4 /*yield*/, handleDeleteWebhook(args, options)];
                 case 1: return [2 /*return*/, _a.sent()];
-                case 2:
-                    if (!(validated === 'v2')) return [3 /*break*/, 4];
-                    return [4 /*yield*/, handleV2Webhook(args, options)];
-                case 3: return [2 /*return*/, _a.sent()];
-                case 4: return [2 /*return*/, false];
+                case 2: return [2 /*return*/, false];
             }
         });
     });
@@ -186,36 +96,12 @@ function handleDeletedDocuments(context, ids) {
         return count + 1;
     }, 0);
 }
-function handleChangedDocuments(args, changedDocs, processingOptions, action) {
-    var reporter = args.reporter;
-    var typeMap = processingOptions.typeMap;
-    return changedDocs.reduce(function (count, doc) {
-        var type = (0, normalize_1.getTypeName)(doc._type);
-        if (!typeMap.objects[type]) {
-            reporter.warn("[sanity] Document \"" + doc._id + "\" has type " + doc._type + " (" + type + "), which is not declared in the GraphQL schema. Make sure you run \"graphql deploy\". Skipping document.");
-            return count;
-        }
-        (0, debug_1.default)('%s document with ID %s', action === 'created' ? 'Created' : 'Updated', doc._id);
-        processingOptions.createNode((0, normalize_1.toGatsbyNode)(doc, processingOptions));
-        return count + 1;
-    }, 0);
-}
-function isDocument(doc) {
-    return Boolean(doc && doc._id);
-}
 function validateWebhookPayload(payload) {
     if (!payload) {
         return false;
     }
-    // Let's test V2 first as those documents could also include an `ids` object
-    if ('__webhooksVersion' in payload && payload.__webhooksVersion === 'v2') {
-        return 'v2';
-    }
-    if ('ids' in payload && typeof payload.ids === 'object') {
-        var _a = payload.ids, created = _a.created, deleted = _a.deleted, updated = _a.updated;
-        if (Array.isArray(created) && Array.isArray(deleted) && Array.isArray(updated)) {
-            return 'v1';
-        }
+    if ('operation' in payload && payload.operation === 'delete') {
+        return 'delete-operation';
     }
     return false;
 }
